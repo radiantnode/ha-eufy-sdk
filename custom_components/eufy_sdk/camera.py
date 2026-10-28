@@ -18,7 +18,6 @@ from .const import (
     DEFAULT_GO2RTC_RTSP_PORT,
     DOMAIN,
 )
-from .entity import device_offline
 from .preload import async_check_preload, on_battery_power
 from .snapshot_policy import snapshot_url
 
@@ -90,12 +89,17 @@ class EufySdkCamera(CoordinatorEntity["EufySdkDataUpdateCoordinator"], Camera):
 
     @property
     def available(self) -> bool:
-        """Available while the bridge still reports this camera and it isn't offline."""
-        return (
-            super().available
-            and self._sn in self.coordinator.data
-            and not device_offline(self.coordinator.data.get(self._sn))
-        )
+        """
+        Available while the bridge still reports this camera.
+
+        Not the cloud's `deviceStatus` (elite01 local patch, 2026-10-27): the
+        cloud answers False now and then for both cameras at once while the
+        bridge's P2P stream to them works, and one such poll hid the camera for
+        the whole poll interval (11 ten-minute blackouts in a day). A camera
+        that is really offline fails to stream, which says so; the Online
+        sensor still shows the cloud's view.
+        """
+        return super().available and self._sn in self.coordinator.data
 
     async def stream_source(self) -> str:
         """Return the go2rtc RTSP URL — HA's stream component + go2rtc do the work."""
